@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "gpumon-core",
-    "gpumon-dashboard",
+    "gpumon-dashboard/src-tauri",
 ]
 
 [workspace.package]

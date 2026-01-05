@@ -179,7 +179,7 @@ impl NvmlFallbackMonitor {
         warn!("Using nvidia-smi fallback - performance may be degraded");
 
         let output = std::process::Command::new("nvidia-smi")
-            .args(&[
+            .args([
                 "--query-gpu=index,name,utilization.gpu,utilization.memory,memory.used,memory.total,temperature.gpu,power.draw",
                 "--format=csv,noheader,nounits"
             ])

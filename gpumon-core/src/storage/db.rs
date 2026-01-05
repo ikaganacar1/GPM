@@ -57,7 +57,7 @@ impl Database {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
-        .bind(&metrics.timestamp)
+        .bind(metrics.timestamp)
         .bind(metrics.gpu_id)
         .bind(&metrics.name)
         .bind(metrics.utilization_gpu)
@@ -89,8 +89,8 @@ impl Database {
             "#,
         )
         .bind(&session.id)
-        .bind(&session.start_time)
-        .bind(&session.end_time)
+        .bind(session.start_time)
+        .bind(session.end_time)
         .bind(&session.model)
         .bind(session.prompt_tokens as i64)
         .bind(session.completion_tokens as i64)

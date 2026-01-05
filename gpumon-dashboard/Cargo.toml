@@ -1,9 +1,0 @@
-[package]
-name = "gpumon-dashboard"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-
-[dependencies]
-# Placeholder - will be implemented in Phase 3
