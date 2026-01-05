@@ -43,7 +43,7 @@ impl MetricsCollector {
         let gpu_temperature = meter
             .f64_gauge("gpu.temperature.celsius")
             .with_description("GPU temperature in Celsius")
-            .with_unit("°C")
+            .with_unit("Cel")
             .build();
 
         let gpu_power = meter

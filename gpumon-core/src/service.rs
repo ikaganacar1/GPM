@@ -58,11 +58,41 @@ impl GpuMonService {
     pub async fn run(&self) -> Result<()> {
         info!("Starting GPU Monitoring Service");
 
+        // Start Prometheus server if enabled
+        if self.config.telemetry.enable_prometheus {
+            let port = self.config.telemetry.metrics_port;
+            self.telemetry.start_prometheus_server(port).await?;
+        }
+
         let mut shutdown_rx = self.shutdown_tx.subscribe();
 
-        let metrics_task = self.spawn_metrics_collector();
-        let ollama_task = self.spawn_ollama_monitor();
-        let maintenance_task = self.spawn_maintenance_worker();
+        // Spawn background tasks
+        let storage1 = Arc::clone(&self.storage);
+        let storage2 = Arc::clone(&self.storage);
+        let storage3 = Arc::clone(&self.storage);
+        let telemetry1 = Arc::clone(&self.telemetry);
+        let telemetry2 = Arc::clone(&self.telemetry);
+        let gpu_monitor = Arc::clone(&self.gpu_monitor);
+        let classifier = Arc::clone(&self.process_classifier);
+        let ollama_monitor = Arc::clone(&self.ollama_monitor);
+        let config1 = self.config.clone();
+        let config2 = self.config.clone();
+        let config3 = self.config.clone();
+        let shutdown_tx1 = self.shutdown_tx.clone();
+        let shutdown_tx2 = self.shutdown_tx.clone();
+        let shutdown_tx3 = self.shutdown_tx.clone();
+
+        let metrics_task = tokio::spawn(async move {
+            Self::metrics_collector_loop(gpu_monitor, classifier, storage1, telemetry1, config1.service.poll_interval_secs, shutdown_tx1).await
+        });
+
+        let ollama_task = tokio::spawn(async move {
+            Self::ollama_monitor_loop(ollama_monitor, storage2, telemetry2, config2.ollama.enabled, shutdown_tx2).await
+        });
+
+        let maintenance_task = tokio::spawn(async move {
+            Self::maintenance_worker_loop(storage3, config3, shutdown_tx3).await
+        });
 
         tokio::select! {
             _ = shutdown_rx.recv() => {
@@ -75,26 +105,31 @@ impl GpuMonService {
 
         let _ = self.shutdown_tx.send(());
 
-        tokio::try_join!(metrics_task, ollama_task, maintenance_task)?;
+        let _ = tokio::join!(metrics_task, ollama_task, maintenance_task);
 
         info!("GPU Monitoring Service stopped");
         Ok(())
     }
 
-    async fn spawn_metrics_collector(&self) -> Result<()> {
-        let mut interval = interval(Duration::from_secs(self.config.service.poll_interval_secs));
-        let gpu_monitor = Arc::clone(&self.gpu_monitor);
-        let classifier = Arc::clone(&self.process_classifier);
-        let storage = Arc::clone(&self.storage);
-        let mut shutdown_rx = self.shutdown_tx.subscribe();
+    async fn metrics_collector_loop(
+        gpu_monitor: Arc<RwLock<GpuMonitorBackend>>,
+        classifier: Arc<RwLock<ProcessClassifier>>,
+        storage: Arc<StorageManager>,
+        telemetry: Arc<TelemetryManager>,
+        poll_interval_secs: u64,
+        shutdown_tx: tokio::sync::broadcast::Sender<()>,
+    ) -> Result<()> {
+        let mut interval = interval(Duration::from_secs(poll_interval_secs));
+        let mut shutdown_rx = shutdown_tx.subscribe();
 
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    if let Err(e) = self.collect_and_store_metrics(
+                    if let Err(e) = Self::collect_and_store_metrics_static(
                         &gpu_monitor,
                         &classifier,
-                        &storage
+                        &storage,
+                        &telemetry
                     ).await {
                         error!("Failed to collect metrics: {}", e);
                     }
@@ -158,17 +193,69 @@ impl GpuMonService {
         Ok(())
     }
 
-    async fn spawn_ollama_monitor(&self) -> Result<()> {
-        if !self.config.ollama.enabled {
+    async fn collect_and_store_metrics_static(
+        gpu_monitor: &Arc<RwLock<GpuMonitorBackend>>,
+        classifier: &Arc<RwLock<ProcessClassifier>>,
+        storage: &Arc<StorageManager>,
+        telemetry: &Arc<TelemetryManager>,
+    ) -> Result<()> {
+        let gpu_metrics = {
+            let monitor = gpu_monitor.read().await;
+            monitor.collect_metrics()?
+        };
+
+        for metrics in &gpu_metrics {
+            storage.database.insert_gpu_metrics(metrics).await?;
+
+            if let Some(otel_metrics) = &telemetry.metrics {
+                otel_metrics.record_gpu_metrics(metrics);
+            }
+
+            if let Some(prom) = &telemetry.prometheus {
+                prom.update_gpu_metrics(metrics);
+            }
+        }
+
+        let classified_processes = {
+            let mut clf = classifier.write().await;
+            clf.classify_gpu_processes(&gpu_metrics)
+        };
+
+        for process in &classified_processes {
+            storage.database.insert_process_event(process).await?;
+        }
+
+        if let Some(prom) = &telemetry.prometheus {
+            prom.update_process_metrics(&classified_processes);
+        }
+
+        if let Some(otel_metrics) = &telemetry.metrics {
+            otel_metrics.record_process_metrics(&classified_processes);
+        }
+
+        debug!(
+            "Collected metrics from {} GPU(s), classified {} processes",
+            gpu_metrics.len(),
+            classified_processes.len()
+        );
+
+        Ok(())
+    }
+
+    async fn ollama_monitor_loop(
+        ollama_monitor: Arc<OllamaMonitor>,
+        storage: Arc<StorageManager>,
+        telemetry: Arc<TelemetryManager>,
+        enabled: bool,
+        shutdown_tx: tokio::sync::broadcast::Sender<()>,
+    ) -> Result<()> {
+        if !enabled {
             info!("Ollama monitoring disabled");
             return Ok(());
         }
 
         let mut interval = interval(Duration::from_secs(5));
-        let ollama_monitor = Arc::clone(&self.ollama_monitor);
-        let storage = Arc::clone(&self.storage);
-        let telemetry = Arc::clone(&self.telemetry);
-        let mut shutdown_rx = self.shutdown_tx.subscribe();
+        let mut shutdown_rx = shutdown_tx.subscribe();
 
         loop {
             tokio::select! {
@@ -203,11 +290,13 @@ impl GpuMonService {
         Ok(())
     }
 
-    async fn spawn_maintenance_worker(&self) -> Result<()> {
+    async fn maintenance_worker_loop(
+        storage: Arc<StorageManager>,
+        config: GpuMonConfig,
+        shutdown_tx: tokio::sync::broadcast::Sender<()>,
+    ) -> Result<()> {
         let mut interval = interval(Duration::from_secs(3600));
-        let storage = Arc::clone(&self.storage);
-        let config = self.config.clone();
-        let mut shutdown_rx = self.shutdown_tx.subscribe();
+        let mut shutdown_rx = shutdown_tx.subscribe();
 
         loop {
             tokio::select! {
