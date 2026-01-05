@@ -25,12 +25,16 @@ A production-grade, lightweight GPU and LLM monitoring service that runs as a ba
 - **Comprehensive Instrumentation**: All metrics auto-recorded
 - **Grafana-Ready**: Compatible with Grafana Cloud and dashboards
 
-### Phase 3: Tauri Dashboard (🚧 Planned)
+### Phase 3: Dashboard & Web API (✅ COMPLETED)
 
-- Real-time GPU monitoring dashboard
-- Weekly usage summaries
-- LLM session analytics
-- Process history and insights
+- **Tauri Desktop App**: Native GPU monitoring dashboard
+- **Web API Server**: REST endpoints on port 8010
+- **Real-time Dashboard**: React + TypeScript UI with Chart.js
+  - Circular gauge meters for utilization, memory, temperature, power
+  - Historical line charts for trends
+  - Multi-GPU support
+  - Auto-refresh every 2 seconds
+- **Deployment Scripts**: Easy start/stop scripts for all services
 
 ## Architecture
 
@@ -40,17 +44,22 @@ GPM/
 │   ├── src/
 │   │   ├── gpu/          # NVML integration & GPU metrics
 │   │   ├── storage/      # SQLite + Parquet storage
+│   │   ├── telemetry/    # OpenTelemetry & Prometheus
+│   │   ├── api.rs        # Web API server
 │   │   ├── classifier.rs # Process workload classification
 │   │   ├── ollama.rs     # Ollama LLM monitoring
 │   │   ├── service.rs    # Main service orchestrator
-│   │   └── main.rs       # Binary entry point
-│   └── Cargo.toml
-└── gpumon-dashboard/     # Tauri GUI (Phase 3)
+│   │   └── main.rs       # Binary entry point (gpumon)
+│   └── src/bin/
+│       └── web-server.rs # Web API entry point
+├── gpumon-dashboard/     # Tauri GUI (React + TypeScript)
+└── scripts/              # Deployment scripts
 ```
 
 ## Requirements
 
 - **Rust**: 1.70+ (2021 edition)
+- **Node.js**: 20+ (for Tauri desktop app)
 - **NVIDIA GPU**: With NVML-compatible drivers (470+)
 - **CUDA/NVML**: Installed with driver
 - **Linux**: Primary target (Windows/macOS support varies)
@@ -88,6 +97,51 @@ The service will:
 4. Classify running processes
 5. Monitor Ollama if it's running
 6. Archive old data to Parquet files
+
+### Using the Dashboard
+
+#### Option 1: Web Mode (Recommended)
+
+```bash
+# Start both web API server and frontend dashboard
+./scripts/start-web.sh
+
+# Or run individual components:
+./scripts/start-backend.sh  # Start monitoring service
+./target/release/web-server  # Start web API on port 8010
+cd gpumon-dashboard/dist && python3 -m http.server 8009  # Start frontend
+```
+
+Access the dashboard at: **http://localhost:8009**
+
+#### Option 2: Tauri Desktop App (Requires Node.js 20+)
+
+```bash
+cd gpumon-dashboard
+npm run tauri dev
+```
+
+#### Option 3: Production Deployment
+
+```bash
+# Start all services in background
+./scripts/start-all.sh
+
+# Stop all services
+./scripts/stop-all.sh
+```
+
+### Web API Endpoints
+
+The web API server (`target/release/web-server`) exposes the following endpoints:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/info` | Dashboard info (GPU count, database path) |
+| `GET /api/realtime` | Real-time GPU metrics |
+| `GET /api/historical?hours=1` | Historical metrics (last N hours) |
+| `GET /api/chart?gpu_id=0&hours=1` | Chart data for specific GPU |
+| `GET /api/llm-sessions?start_date=&end_date=` | LLM sessions |
 
 ## Configuration
 
@@ -388,24 +442,32 @@ Ollama API not reachable
 
 ## Roadmap
 
-### Phase 2 (Next)
-- [ ] Full OpenTelemetry integration
-- [ ] Prometheus metrics endpoint
-- [ ] Distributed tracing
-- [ ] Alerting system
+### Phase 1 (✅ Completed)
+- [x] Core GPU monitoring service
+- [x] Process classification (Gaming, LLM, ML, General)
+- [x] SQLite storage with Parquet archival
+- [x] Ollama LLM monitoring
 
-### Phase 3
-- [ ] Tauri dashboard with real-time charts
-- [ ] Weekly review interface
-- [ ] Export functionality (CSV, JSON, Parquet)
+### Phase 2 (✅ Completed)
+- [x] OpenTelemetry metrics
+- [x] Prometheus metrics endpoint
+- [x] Distributed tracing
+- [x] Grafana integration
 
-### Phase 4
+### Phase 3 (✅ Completed)
+- [x] Tauri desktop dashboard
+- [x] Web API server
+- [x] Real-time charts with Chart.js
+- [x] Deployment scripts
+
+### Phase 4 (Planned)
+- [ ] Web-compatible frontend (fetch-based)
 - [ ] eBPF-based game detection
 - [ ] Smart archival with compression
 - [ ] Desktop notifications
 - [ ] System service installation (systemd/launchd)
 
-### Phase 5
+### Phase 5 (Planned)
 - [ ] Cross-platform support (Windows, macOS)
 - [ ] Performance optimizations
 - [ ] Integration tests
