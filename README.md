@@ -4,7 +4,7 @@ A production-grade, lightweight GPU and LLM monitoring service that runs as a ba
 
 ## Features
 
-### Phase 1: Core Service (✅ Implemented)
+### Phase 1: Core Service (✅ COMPLETED)
 
 - **NVML Integration**: Direct GPU monitoring via NVML with automatic fallback to nvidia-smi
 - **Process Classification**: Automatic detection and categorization of workloads:
@@ -17,12 +17,13 @@ A production-grade, lightweight GPU and LLM monitoring service that runs as a ba
 - **Parquet Archival**: Efficient long-term storage of historical data
 - **Real-time Metrics**: Poll GPU stats every 2 seconds (configurable)
 
-### Phase 2: OpenTelemetry Integration (🚧 Planned)
+### Phase 2: OpenTelemetry & Prometheus (✅ COMPLETED)
 
-- Distributed tracing for LLM sessions
-- Prometheus metrics export
-- OTLP telemetry export
-- Semantic metrics and labels
+- **OpenTelemetry Metrics (v0.27)**: GPU, LLM, and process metrics
+- **Prometheus Exporter**: `/metrics` endpoint on port 9090
+- **OTLP Export**: gRPC export to OpenTelemetry collectors
+- **Comprehensive Instrumentation**: All metrics auto-recorded
+- **Grafana-Ready**: Compatible with Grafana Cloud and dashboards
 
 ### Phase 3: Tauri Dashboard (🚧 Planned)
 
@@ -218,6 +219,56 @@ GPM automatically classifies GPU-using processes:
 
 ### General Compute
 - Any other GPU-utilizing process
+
+## Prometheus Metrics
+
+GPM exposes Prometheus metrics on `http://localhost:9090/metrics` (configurable).
+
+### Available Metrics
+
+**GPU Metrics**:
+- `gpumon_gpu_utilization_percent` - GPU utilization % (gauge)
+- `gpumon_gpu_memory_used_bytes` - VRAM usage (gauge)
+- `gpumon_gpu_memory_total_bytes` - Total VRAM (gauge)
+- `gpumon_gpu_temperature_celsius` - GPU temperature (gauge)
+- `gpumon_gpu_power_watts` - Power draw (gauge)
+
+Labels: `gpu_id`, `gpu_name`
+
+**LLM Metrics**:
+- `gpumon_llm_tokens_per_second` - TPS distribution (histogram)
+- `gpumon_llm_time_to_first_token_ms` - TTFT latency (histogram)
+- `gpumon_llm_session_count` - Session count by model (gauge)
+
+Labels: `model`
+
+**Process Metrics**:
+- `gpumon_process_count` - Process count by category (gauge)
+- `gpumon_process_gpu_memory_bytes` - GPU memory by category (gauge)
+
+Labels: `category`
+
+### Example Prometheus Query
+
+```bash
+# View all metrics
+curl http://localhost:9090/metrics
+
+# GPU utilization
+curl http://localhost:9090/metrics | grep gpumon_gpu_utilization_percent
+
+# LLM performance
+curl http://localhost:9090/metrics | grep gpumon_llm_tokens_per_second
+```
+
+### Grafana Integration
+
+Import metrics into Grafana using Prometheus data source:
+1. Add Prometheus datasource: `http://localhost:9090`
+2. Create dashboards with queries like:
+   - `gpumon_gpu_utilization_percent{gpu_id="0"}`
+   - `rate(gpumon_llm_session_count[5m])`
+   - `gpumon_process_count{category="gaming"}`
 
 ## Ollama Integration
 
