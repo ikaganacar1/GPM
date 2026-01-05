@@ -1,13 +1,13 @@
 # GPM Configuration Example
-# Copy this file to ~/.config/gpumon/config.toml to customize
+# Copy this file to ~/.config/gpm/config.toml to customize
 
 [service]
 # How often to poll GPU metrics (in seconds)
 poll_interval_secs = 2
 
 # Directory for storing data (SQLite database and archives)
-# Uses ~/.local/share/gpumon by default
-# data_dir = "~/.local/share/gpumon"
+# Uses ~/.local/share/gpm by default
+# data_dir = "~/.local/share/gpm"
 
 [gpu]
 # Enable NVML for GPU monitoring
@@ -34,8 +34,8 @@ retention_days = 7
 enable_parquet_archival = true
 
 # Directory for Parquet archives
-# Uses ~/.local/share/gpumon/archive by default
-# archive_dir = "~/.local/share/gpumon/archive"
+# Uses ~/.local/share/gpm/archive by default
+# archive_dir = "~/.local/share/gpm/archive"
 
 [telemetry]
 # Enable OpenTelemetry export

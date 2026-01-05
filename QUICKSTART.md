@@ -21,35 +21,35 @@ ollama list
 
 ```bash
 cd /mnt/2tb_ssd/GPM
-cargo build --release --package gpumon-core
+cargo build --release --package gpm-core
 ```
 
-The binary will be at: `target/release/gpumon`
+The binary will be at: `target/release/gpm`
 
 ### Step 2: (Optional) Configure
 
 ```bash
 # Create config directory
-mkdir -p ~/.config/gpumon
+mkdir -p ~/.config/gpm
 
 # Copy example config
-cp config.example.toml ~/.config/gpumon/config.toml
+cp config.example.toml ~/.config/gpm/config.toml
 
 # Edit if needed
-nano ~/.config/gpumon/config.toml
+nano ~/.config/gpm/config.toml
 ```
 
 ### Step 3: Run GPM
 
 ```bash
 # Run directly
-./target/release/gpumon
+./target/release/gpm
 
 # Or with cargo
-cargo run --release --package gpumon-core
+cargo run --release --package gpm-core
 
 # Run in background
-nohup ./target/release/gpumon > /tmp/gpumon.log 2>&1 &
+nohup ./target/release/gpm > /tmp/gpumon.log 2>&1 &
 ```
 
 ## Verify It's Working
@@ -68,7 +68,7 @@ nohup ./target/release/gpumon > /tmp/gpumon.log 2>&1 &
 
 ```bash
 # After a few seconds, check that data is being collected
-sqlite3 ~/.local/share/gpumon/gpumon.db
+sqlite3 ~/.local/share/gpm/gpm.db
 
 # Query recent metrics
 SELECT COUNT(*) FROM gpu_metrics;
@@ -80,10 +80,10 @@ SELECT COUNT(*) FROM gpu_metrics;
 
 ```bash
 # Watch the database grow
-watch -n 1 'sqlite3 ~/.local/share/gpumon/gpumon.db "SELECT COUNT(*) as total_metrics FROM gpu_metrics"'
+watch -n 1 'sqlite3 ~/.local/share/gpm/gpm.db "SELECT COUNT(*) as total_metrics FROM gpu_metrics"'
 
 # View latest GPU metrics
-sqlite3 ~/.local/share/gpumon/gpumon.db "
+sqlite3 ~/.local/share/gpm/gpm.db "
 SELECT
     datetime(timestamp) as time,
     gpu_id,
@@ -101,12 +101,12 @@ LIMIT 10;
 
 ### Monitor Gaming Session
 
-1. Start GPM: `./target/release/gpumon`
+1. Start GPM: `./target/release/gpm`
 2. Launch a game from Steam
 3. After your session, query:
 
 ```sql
-sqlite3 ~/.local/share/gpumon/gpumon.db "
+sqlite3 ~/.local/share/gpm/gpm.db "
 SELECT
     name,
     category,
@@ -127,7 +127,7 @@ LIMIT 20;
 3. Query results:
 
 ```sql
-sqlite3 ~/.local/share/gpumon/gpumon.db "
+sqlite3 ~/.local/share/gpm/gpm.db "
 SELECT
     model,
     datetime(start_time) as started,
@@ -144,7 +144,7 @@ LIMIT 10;
 ### Weekly Summary
 
 ```sql
-sqlite3 ~/.local/share/gpumon/gpumon.db "
+sqlite3 ~/.local/share/gpm/gpm.db "
 SELECT
     category,
     event_count,
@@ -194,7 +194,7 @@ enabled = false
 
 ```bash
 # Check database size
-du -h ~/.local/share/gpumon/gpumon.db
+du -h ~/.local/share/gpm/gpm.db
 
 # Enable archival in config:
 [storage]
@@ -202,7 +202,7 @@ enable_parquet_archival = true
 retention_days = 3  # Reduce retention
 
 # Manually clean old data:
-sqlite3 ~/.local/share/gpumon/gpumon.db "
+sqlite3 ~/.local/share/gpm/gpm.db "
 DELETE FROM gpu_metrics WHERE timestamp < datetime('now', '-3 days');
 VACUUM;
 "
@@ -222,7 +222,7 @@ VACUUM;
 # If running in foreground: Ctrl+C
 
 # If running in background:
-pkill gpumon
+pkill gpm
 
 # Or find and kill:
 ps aux | grep gpumon

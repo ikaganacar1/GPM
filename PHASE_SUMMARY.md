@@ -18,7 +18,7 @@ GPM (GPU & LLM Monitoring) is a production-ready, lightweight GPU monitoring ser
   - Power consumption (W)
   - Running processes with GPU memory allocation
 
-**Code**: `gpumon-core/src/gpu/`
+**Code**: `gpm-core/src/gpu/`
 
 #### 2. Process Classification Engine
 Automatically categorizes GPU-using processes into:
@@ -39,7 +39,7 @@ Automatically categorizes GPU-using processes into:
 - **General Compute**:
   - All other GPU workloads
 
-**Code**: `gpumon-core/src/classifier.rs`
+**Code**: `gpm-core/src/classifier.rs`
 
 #### 3. Ollama LLM Monitoring
 - API health checking (port 11434)
@@ -51,10 +51,10 @@ Automatically categorizes GPU-using processes into:
   - **Time To First Token (TTFT)**: Latency metric
   - **Time Per Output Token (TPOT)**: Per-token generation time
 
-**Code**: `gpumon-core/src/ollama.rs`
+**Code**: `gpm-core/src/ollama.rs`
 
 #### 4. SQLite Storage Layer
-**Schema** (`gpumon-core/src/storage/schema.sql`):
+**Schema** (`gpm-core/src/storage/schema.sql`):
 - `gpu_metrics`: Time-series GPU data (timestamp-indexed)
 - `llm_sessions`: Complete LLM session records
 - `process_events`: Classified process activity
@@ -65,13 +65,13 @@ Automatically categorizes GPU-using processes into:
 - Efficient indexing for time-range queries
 - Upsert support for session updates
 
-**Code**: `gpumon-core/src/storage/db.rs`
+**Code**: `gpm-core/src/storage/db.rs`
 
 #### 5. Parquet Archival Framework
 - Archive data older than configurable retention period (default: 7 days)
 - Efficient long-term storage using Apache Parquet
 - Keeps SQLite database <100MB
-- **Code**: `gpumon-core/src/storage/parquet.rs`
+- **Code**: `gpm-core/src/storage/parquet.rs`
 
 #### 6. Async Service Orchestrator
 Three concurrent async tasks:
@@ -84,13 +84,13 @@ Three concurrent async tasks:
 - Comprehensive error handling
 - Structured logging with `tracing`
 
-**Code**: `gpumon-core/src/service.rs`
+**Code**: `gpm-core/src/service.rs`
 
 #### 7. Configuration Management
 Supports three configuration sources (priority order):
 1. Default values (hardcoded)
-2. Config file: `~/.config/gpumon/config.toml`
-3. Environment variables: `GPUMON_*`
+2. Config file: `~/.config/gpm/config.toml`
+3. Environment variables: `GPM_*`
 
 **Example**:
 ```toml
@@ -110,7 +110,7 @@ retention_days = 7
 enable_parquet_archival = true
 ```
 
-**Code**: `gpumon-core/src/config.rs`
+**Code**: `gpm-core/src/config.rs`
 
 ---
 
@@ -142,7 +142,7 @@ Labels: `model`
 
 Labels: `category`, `process_name`, `pid`
 
-**Code**: `gpumon-core/src/telemetry/metrics.rs`
+**Code**: `gpm-core/src/telemetry/metrics.rs`
 
 #### 2. Prometheus Exporter
 - **Endpoint**: `http://localhost:9090/metrics`
@@ -151,13 +151,13 @@ Labels: `category`, `process_name`, `pid`
 
 **Metrics Exposed**:
 ```
-gpumon_gpu_utilization_percent{gpu_id="0",gpu_name="RTX 5070"}
-gpumon_gpu_memory_used_bytes{gpu_id="0",gpu_name="RTX 5070"}
-gpumon_llm_tokens_per_second_bucket{model="llama2",le="50"}
-gpumon_process_count{category="gaming"}
+gpm_gpu_utilization_percent{gpu_id="0",gpu_name="RTX 5070"}
+gpm_gpu_memory_used_bytes{gpu_id="0",gpu_name="RTX 5070"}
+gpm_llm_tokens_per_second_bucket{model="llama2",le="50"}
+gpm_process_count{category="gaming"}
 ```
 
-**Code**: `gpumon-core/src/telemetry/prometheus.rs`
+**Code**: `gpm-core/src/telemetry/prometheus.rs`
 
 #### 3. OTLP Export
 - **Endpoint**: Configurable (default: `http://localhost:4317`)
@@ -174,7 +174,7 @@ Compatible with:
 - OpenTelemetry Collector
 - Any OTLP-compatible backend
 
-**Code**: `gpumon-core/src/telemetry/mod.rs`
+**Code**: `gpm-core/src/telemetry/mod.rs`
 
 #### 4. Telemetry Integration
 Metrics automatically recorded for:
@@ -197,7 +197,7 @@ GPM/
 ├── LICENSE                       # MIT license
 ├── config.example.toml           # Example configuration
 │
-├── gpumon-core/                  # Main service crate
+├── gpm-core/                  # Main service crate
 │   ├── Cargo.toml
 │   └── src/
 │       ├── main.rs               # Binary entry point
@@ -221,7 +221,7 @@ GPM/
 │           ├── prometheus.rs     # Prom exporter
 │           └── distributed_tracing.rs  # Tracing (placeholder)
 │
-└── gpumon-dashboard/             # Future: Tauri GUI (Phase 3)
+└── gpm-dashboard/             # Future: Tauri GUI (Phase 3)
 ```
 
 ---
@@ -230,32 +230,32 @@ GPM/
 
 ### Build
 ```bash
-cargo build --release --package gpumon-core
+cargo build --release --package gpm-core
 ```
 
 ### Run
 ```bash
 # Direct execution
-./target/release/gpumon
+./target/release/gpm
 
 # With custom config
-GPUMON_SERVICE_POLL_INTERVAL_SECS=5 ./target/release/gpumon
+GPM_SERVICE_POLL_INTERVAL_SECS=5 ./target/release/gpm
 
 # Run in background
-nohup ./target/release/gpumon > /tmp/gpumon.log 2>&1 &
+nohup ./target/release/gpm > /tmp/gpumon.log 2>&1 &
 ```
 
 ### Query Data
 ```bash
 # View GPU metrics
-sqlite3 ~/.local/share/gpumon/gpumon.db "
+sqlite3 ~/.local/share/gpm/gpm.db "
 SELECT datetime(timestamp), utilization_gpu, temperature
 FROM gpu_metrics
 WHERE timestamp > datetime('now', '-1 hour')
 ORDER BY timestamp DESC LIMIT 10;"
 
 # LLM session stats
-sqlite3 ~/.local/share/gpumon/gpumon.db "
+sqlite3 ~/.local/share/gpm/gpm.db "
 SELECT model, COUNT(*) as sessions,
        AVG(tokens_per_second) as avg_tps,
        AVG(time_to_first_token_ms) as avg_ttft
@@ -263,7 +263,7 @@ FROM llm_sessions
 GROUP BY model;"
 
 # Process categories
-sqlite3 ~/.local/share/gpumon/gpumon.db "
+sqlite3 ~/.local/share/gpm/gpm.db "
 SELECT category, COUNT(*) as count,
        AVG(gpu_memory_mb) as avg_mem
 FROM process_events
@@ -277,7 +277,7 @@ GROUP BY category;"
 curl http://localhost:9090/metrics
 
 # Specific metric
-curl http://localhost:9090/metrics | grep gpumon_gpu_utilization
+curl http://localhost:9090/metrics | grep gpm_gpu_utilization
 ```
 
 ---

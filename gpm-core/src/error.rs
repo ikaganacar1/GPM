@@ -1,0 +1,51 @@
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum GpmError {
+    #[error("NVML initialization failed: {0}")]
+    NvmlInitError(String),
+
+    #[error("NVML operation failed: {0}")]
+    NvmlError(String),
+
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] sqlx::Error),
+
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Configuration error: {0}")]
+    ConfigError(#[from] config::ConfigError),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(#[from] serde_json::Error),
+
+    #[error("HTTP request error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Parquet error: {0}")]
+    ParquetError(String),
+
+    #[error("Process monitoring error: {0}")]
+    ProcessError(String),
+
+    #[error("Ollama monitoring error: {0}")]
+    OllamaError(String),
+
+    #[error("Service not available: {0}")]
+    ServiceUnavailable(String),
+
+    #[error("Invalid data: {0}")]
+    InvalidData(String),
+
+    #[error("Prometheus error: {0}")]
+    PrometheusError(String),
+}
+
+impl From<prometheus::Error> for GpmError {
+    fn from(e: prometheus::Error) -> Self {
+        GpmError::PrometheusError(e.to_string())
+    }
+}
+
+pub type Result<T> = std::result::Result<T, GpmError>;

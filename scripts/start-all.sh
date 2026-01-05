@@ -23,7 +23,7 @@ cleanup() {
     echo ""
     echo -e "${YELLOW}Stopping services...${NC}"
     pkill -f "python3 -m http.server 8009" 2>/dev/null || true
-    pkill -f gpumon 2>/dev/null || true
+    pkill -f "target/release/gpm" 2>/dev/null || true
     echo -e "${GREEN}All services stopped${NC}"
     exit 0
 }
@@ -33,20 +33,20 @@ trap cleanup SIGINT SIGTERM
 
 # Start backend
 echo -e "${GREEN}[1/2] Starting backend service...${NC}"
-if ! pgrep -f "gpumon" > /dev/null; then
-    if [ ! -f "target/release/gpumon" ]; then
+if ! pgrep -f "target/release/gpm" > /dev/null; then
+    if [ ! -f "target/release/gpm" ]; then
         echo -e "${YELLOW}Building backend...${NC}"
-        cargo build --release --package gpumon-core
+        cargo build --release --package gpm-core
     fi
 
-    mkdir -p ~/.local/share/gpumon
-    mkdir -p ~/.config/gpumon
+    mkdir -p ~/.local/share/gpm
+    mkdir -p ~/.config/gpm
 
-    if [ ! -f ~/.config/gpumon/config.toml ] && [ -f config.example.toml ]; then
-        cp config.example.toml ~/.config/gpumon/config.toml
+    if [ ! -f ~/.config/gpm/config.toml ] && [ -f config.example.toml ]; then
+        cp config.example.toml ~/.config/gpm/config.toml
     fi
 
-    ./target/release/gpumon > /tmp/gpumon.log 2>&1 &
+    ./target/release/gpm > /tmp/gpm.log 2>&1 &
     sleep 2
     echo -e "${GREEN}Backend started${NC}"
 else
@@ -55,7 +55,7 @@ fi
 
 # Start frontend
 echo -e "${GREEN}[2/2] Starting frontend dashboard...${NC}"
-cd gpumon-dashboard
+cd gpm-dashboard
 
 if ! lsof -Pi :8009 -sTCP:LISTEN -t >/dev/null 2>&1; then
     if [ ! -d "dist" ]; then
@@ -79,7 +79,7 @@ echo -e "${GREEN}GPM is now running!${NC}"
 echo ""
 echo "  Dashboard:  ${BLUE}http://localhost:8009${NC}"
 echo "  Metrics:    ${BLUE}http://localhost:9090/metrics${NC}"
-echo "  Database:   ~/.local/share/gpumon/gpumon.db"
+echo "  Database:   ~/.local/share/gpm/gpm.db"
 echo ""
 echo "Press Ctrl+C to stop all services"
 echo ""
@@ -89,7 +89,7 @@ while true; do
     sleep 1
 
     # Check if services are still running
-    if ! pgrep -f "gpumon" > /dev/null; then
+    if ! pgrep -f "target/release/gpm" > /dev/null; then
         echo -e "${RED}Backend service stopped unexpectedly!${NC}"
         cleanup
     fi

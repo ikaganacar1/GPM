@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DASHBOARD_DIR="$PROJECT_ROOT/gpumon-dashboard"
+DASHBOARD_DIR="$PROJECT_ROOT/gpm-dashboard"
 PORT=8009
 
 cd "$DASHBOARD_DIR"

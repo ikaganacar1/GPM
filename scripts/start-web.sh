@@ -23,7 +23,7 @@ cleanup() {
     echo ""
     echo -e "${YELLOW}Stopping services...${NC}"
     pkill -f "python3 -m http.server 8009" 2>/dev/null || true
-    pkill -f "web-server" 2>/dev/null || true
+    pkill -f "gpm-server" 2>/dev/null || true
     echo -e "${GREEN}All services stopped${NC}"
     exit 0
 }
@@ -33,25 +33,25 @@ trap cleanup SIGINT SIGTERM
 
 # Build binaries
 echo -e "${YELLOW}Building binaries...${NC}"
-cargo build --release --bin web-server
+cargo build --release --bin gpm-server
 
 # Start web API server
 echo -e "${GREEN}[1/2] Starting web API server on port 8010...${NC}"
-./target/release/web-server > /tmp/gpumon-web-api.log 2>&1 &
+./target/release/gpm-server > /tmp/gpm-web-api.log 2>&1 &
 API_PID=$!
 sleep 2
 
 # Check if API started
 if ! curl -s http://localhost:8010/api/info > /dev/null 2>&1; then
     echo -e "${RED}Failed to start API server${NC}"
-    cat /tmp/gpumon-web-api.log
+    cat /tmp/gpm-web-api.log
     exit 1
 fi
 echo -e "${GREEN}API server started (PID: $API_PID)${NC}"
 
 # Start frontend
 echo -e "${GREEN}[2/2] Starting frontend on port 8009...${NC}"
-cd gpumon-dashboard
+cd gpm-dashboard
 
 # Build frontend if needed
 if [ ! -d "dist" ]; then
@@ -79,7 +79,7 @@ while true; do
     sleep 1
 
     # Check if services are still running
-    if ! pgrep -f "web-server" > /dev/null; then
+    if ! pgrep -f "gpm-server" > /dev/null; then
         echo -e "${RED}API server stopped unexpectedly!${NC}"
         cleanup
     fi

@@ -11,12 +11,21 @@ NC='\033[0m' # No Color
 echo -e "${YELLOW}Stopping GPM services...${NC}"
 
 # Stop backend
-if pgrep -f "gpumon" > /dev/null; then
+if pgrep -f "target/release/gpm" > /dev/null; then
     echo "Stopping backend service..."
-    pkill -f "gpumon"
+    pkill -f "target/release/gpm"
     echo -e "${GREEN}Backend stopped${NC}"
 else
     echo -e "${YELLOW}Backend not running${NC}"
+fi
+
+# Stop API server
+if pgrep -f "gpm-server" > /dev/null; then
+    echo "Stopping API server..."
+    pkill -f "gpm-server"
+    echo -e "${GREEN}API server stopped${NC}"
+else
+    echo -e "${YELLOW}API server not running${NC}"
 fi
 
 # Stop frontend

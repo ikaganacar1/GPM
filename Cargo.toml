@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "gpumon-core",
-    "gpumon-dashboard/src-tauri",
+    "gpm-core",
+    "gpm-dashboard/src-tauri",
 ]
 
 [workspace.package]
@@ -10,7 +10,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["GPM Contributors"]
 license = "MIT"
-repository = "https://github.com/yourusername/gpumon"
+repository = "https://github.com/yourusername/gpm"
 
 [workspace.dependencies]
 # Core dependencies

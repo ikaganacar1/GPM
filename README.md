@@ -40,7 +40,7 @@ A production-grade, lightweight GPU and LLM monitoring service that runs as a ba
 
 ```
 GPM/
-├── gpumon-core/          # Core monitoring service (Rust)
+├── gpm-core/          # Core monitoring service (Rust)
 │   ├── src/
 │   │   ├── gpu/          # NVML integration & GPU metrics
 │   │   ├── storage/      # SQLite + Parquet storage
@@ -52,7 +52,7 @@ GPM/
 │   │   └── main.rs       # Binary entry point (gpumon)
 │   └── src/bin/
 │       └── web-server.rs # Web API entry point
-├── gpumon-dashboard/     # Tauri GUI (React + TypeScript)
+├── gpm-dashboard/     # Tauri GUI (React + TypeScript)
 └── scripts/              # Deployment scripts
 ```
 
@@ -75,24 +75,24 @@ git clone <your-repo-url>
 cd GPM
 
 # Build the service
-cargo build --release --package gpumon-core
+cargo build --release --package gpm-core
 
-# The binary will be at: target/release/gpumon
+# The binary will be at: target/release/gpm
 ```
 
 ### Quick Start
 
 ```bash
 # Run the monitoring service
-cargo run --package gpumon-core
+cargo run --package gpm-core
 
 # Or use the compiled binary
-./target/release/gpumon
+./target/release/gpm
 ```
 
 The service will:
 1. Initialize NVML and connect to your GPU(s)
-2. Create a SQLite database at `~/.local/share/gpumon/gpumon.db`
+2. Create a SQLite database at `~/.local/share/gpm/gpm.db`
 3. Start polling GPU metrics every 2 seconds
 4. Classify running processes
 5. Monitor Ollama if it's running
@@ -109,7 +109,7 @@ The service will:
 # Or run individual components:
 ./scripts/start-backend.sh  # Start monitoring service
 ./target/release/web-server  # Start web API on port 8010
-cd gpumon-dashboard/dist && python3 -m http.server 8009  # Start frontend
+cd gpm-dashboard/dist && python3 -m http.server 8009  # Start frontend
 ```
 
 Access the dashboard at: **http://localhost:8009**
@@ -117,7 +117,7 @@ Access the dashboard at: **http://localhost:8009**
 #### Option 2: Tauri Desktop App (Requires Node.js 20+)
 
 ```bash
-cd gpumon-dashboard
+cd gpm-dashboard
 npm run tauri dev
 ```
 
@@ -148,17 +148,17 @@ The web API server (`target/release/web-server`) exposes the following endpoints
 GPM looks for configuration in the following order:
 
 1. Default values (hardcoded)
-2. Config file at `~/.config/gpumon/config.toml`
-3. Environment variables with `GPUMON_` prefix
+2. Config file at `~/.config/gpm/config.toml`
+3. Environment variables with `GPM_` prefix
 
 ### Example Configuration
 
-Create `~/.config/gpumon/config.toml`:
+Create `~/.config/gpm/config.toml`:
 
 ```toml
 [service]
 poll_interval_secs = 2
-data_dir = "~/.local/share/gpumon"
+data_dir = "~/.local/share/gpm"
 
 [gpu]
 enable_nvml = true
@@ -172,7 +172,7 @@ api_url = "http://localhost:11434"
 [storage]
 retention_days = 7
 enable_parquet_archival = true
-archive_dir = "~/.local/share/gpumon/archive"
+archive_dir = "~/.local/share/gpm/archive"
 
 [telemetry]
 enable_opentelemetry = true
@@ -190,18 +190,18 @@ enable_desktop_notifications = false
 
 ```bash
 # Override any config with environment variables
-export GPUMON_SERVICE_POLL_INTERVAL_SECS=5
-export GPUMON_OLLAMA_ENABLED=true
-export GPUMON_STORAGE_RETENTION_DAYS=14
+export GPM_SERVICE_POLL_INTERVAL_SECS=5
+export GPM_OLLAMA_ENABLED=true
+export GPM_STORAGE_RETENTION_DAYS=14
 
-cargo run --package gpumon-core
+cargo run --package gpm-core
 ```
 
 ## Data Storage
 
 ### SQLite Database
 
-Location: `~/.local/share/gpumon/gpumon.db`
+Location: `~/.local/share/gpm/gpm.db`
 
 Tables:
 - `gpu_metrics`: GPU utilization, memory, temperature, power
@@ -211,7 +211,7 @@ Tables:
 
 ### Parquet Archives
 
-Location: `~/.local/share/gpumon/archive/`
+Location: `~/.local/share/gpm/archive/`
 
 Old data (>7 days by default) is automatically archived to Parquet files for efficient storage and querying.
 
@@ -221,17 +221,17 @@ Old data (>7 days by default) is automatically archived to Parquet files for eff
 
 ```bash
 # Run with debug logging
-RUST_LOG=debug cargo run --package gpumon-core
+RUST_LOG=debug cargo run --package gpm-core
 
 # Run in background
-cargo run --package gpumon-core > /dev/null 2>&1 &
+cargo run --package gpm-core > /dev/null 2>&1 &
 ```
 
 ### Query Data (SQLite)
 
 ```bash
 # Access the database
-sqlite3 ~/.local/share/gpumon/gpumon.db
+sqlite3 ~/.local/share/gpm/gpm.db
 
 # Recent GPU metrics
 SELECT timestamp, gpu_id, utilization_gpu, memory_used
@@ -281,24 +281,24 @@ GPM exposes Prometheus metrics on `http://localhost:9090/metrics` (configurable)
 ### Available Metrics
 
 **GPU Metrics**:
-- `gpumon_gpu_utilization_percent` - GPU utilization % (gauge)
-- `gpumon_gpu_memory_used_bytes` - VRAM usage (gauge)
-- `gpumon_gpu_memory_total_bytes` - Total VRAM (gauge)
-- `gpumon_gpu_temperature_celsius` - GPU temperature (gauge)
-- `gpumon_gpu_power_watts` - Power draw (gauge)
+- `gpm_gpu_utilization_percent` - GPU utilization % (gauge)
+- `gpm_gpu_memory_used_bytes` - VRAM usage (gauge)
+- `gpm_gpu_memory_total_bytes` - Total VRAM (gauge)
+- `gpm_gpu_temperature_celsius` - GPU temperature (gauge)
+- `gpm_gpu_power_watts` - Power draw (gauge)
 
 Labels: `gpu_id`, `gpu_name`
 
 **LLM Metrics**:
-- `gpumon_llm_tokens_per_second` - TPS distribution (histogram)
-- `gpumon_llm_time_to_first_token_ms` - TTFT latency (histogram)
-- `gpumon_llm_session_count` - Session count by model (gauge)
+- `gpm_llm_tokens_per_second` - TPS distribution (histogram)
+- `gpm_llm_time_to_first_token_ms` - TTFT latency (histogram)
+- `gpm_llm_session_count` - Session count by model (gauge)
 
 Labels: `model`
 
 **Process Metrics**:
-- `gpumon_process_count` - Process count by category (gauge)
-- `gpumon_process_gpu_memory_bytes` - GPU memory by category (gauge)
+- `gpm_process_count` - Process count by category (gauge)
+- `gpm_process_gpu_memory_bytes` - GPU memory by category (gauge)
 
 Labels: `category`
 
@@ -309,10 +309,10 @@ Labels: `category`
 curl http://localhost:9090/metrics
 
 # GPU utilization
-curl http://localhost:9090/metrics | grep gpumon_gpu_utilization_percent
+curl http://localhost:9090/metrics | grep gpm_gpu_utilization_percent
 
 # LLM performance
-curl http://localhost:9090/metrics | grep gpumon_llm_tokens_per_second
+curl http://localhost:9090/metrics | grep gpm_llm_tokens_per_second
 ```
 
 ### Grafana Integration
@@ -320,9 +320,9 @@ curl http://localhost:9090/metrics | grep gpumon_llm_tokens_per_second
 Import metrics into Grafana using Prometheus data source:
 1. Add Prometheus datasource: `http://localhost:9090`
 2. Create dashboards with queries like:
-   - `gpumon_gpu_utilization_percent{gpu_id="0"}`
-   - `rate(gpumon_llm_session_count[5m])`
-   - `gpumon_process_count{category="gaming"}`
+   - `gpm_gpu_utilization_percent{gpu_id="0"}`
+   - `rate(gpm_llm_session_count[5m])`
+   - `gpm_process_count{category="gaming"}`
 
 ## Ollama Integration
 
@@ -338,7 +338,7 @@ GPM monitors Ollama LLM sessions and tracks:
 ### Viewing LLM Stats
 
 ```bash
-sqlite3 ~/.local/share/gpumon/gpumon.db
+sqlite3 ~/.local/share/gpm/gpm.db
 
 SELECT
     model,
@@ -356,7 +356,7 @@ ORDER BY sessions DESC;
 ### Project Structure
 
 ```
-gpumon-core/
+gpm-core/
 ├── src/
 │   ├── gpu/
 │   │   ├── nvml.rs         # NVML wrapper with fallback
@@ -380,13 +380,13 @@ gpumon-core/
 
 ```bash
 # Run all tests
-cargo test --package gpumon-core
+cargo test --package gpm-core
 
 # Run with output
-cargo test --package gpumon-core -- --nocapture
+cargo test --package gpm-core -- --nocapture
 
 # Run specific test
-cargo test --package gpumon-core test_ollama_detection
+cargo test --package gpm-core test_ollama_detection
 ```
 
 ### Code Quality
@@ -396,10 +396,10 @@ cargo test --package gpumon-core test_ollama_detection
 cargo fmt
 
 # Lint
-cargo clippy --package gpumon-core
+cargo clippy --package gpm-core
 
 # Check without building
-cargo check --package gpumon-core
+cargo check --package gpm-core
 ```
 
 ## Troubleshooting
