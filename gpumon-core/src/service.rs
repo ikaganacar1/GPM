@@ -4,6 +4,7 @@ use crate::error::Result;
 use crate::gpu::GpuMonitorBackend;
 use crate::ollama::OllamaMonitor;
 use crate::storage::StorageManager;
+use crate::telemetry::TelemetryManager;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
@@ -15,6 +16,7 @@ pub struct GpuMonService {
     process_classifier: Arc<RwLock<ProcessClassifier>>,
     ollama_monitor: Arc<OllamaMonitor>,
     storage: Arc<StorageManager>,
+    telemetry: Arc<TelemetryManager>,
     shutdown_tx: tokio::sync::broadcast::Sender<()>,
 }
 
@@ -32,6 +34,12 @@ impl GpuMonService {
 
         let storage = Arc::new(StorageManager::new(&config).await?);
 
+        let telemetry = Arc::new(TelemetryManager::new(&config)?);
+
+        if telemetry.prometheus.is_some() {
+            telemetry.start_prometheus_server(config.telemetry.metrics_port).await?;
+        }
+
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
 
         info!("GPU Monitoring Service initialized");
@@ -42,6 +50,7 @@ impl GpuMonService {
             process_classifier,
             ollama_monitor,
             storage,
+            telemetry,
             shutdown_tx,
         })
     }
@@ -113,6 +122,14 @@ impl GpuMonService {
 
         for metrics in &gpu_metrics {
             storage.database.insert_gpu_metrics(metrics).await?;
+
+            if let Some(otel_metrics) = &self.telemetry.metrics {
+                otel_metrics.record_gpu_metrics(metrics);
+            }
+
+            if let Some(prom) = &self.telemetry.prometheus {
+                prom.update_gpu_metrics(metrics);
+            }
         }
 
         let classified_processes = {
@@ -122,6 +139,14 @@ impl GpuMonService {
 
         for process in &classified_processes {
             storage.database.insert_process_event(process).await?;
+        }
+
+        if let Some(prom) = &self.telemetry.prometheus {
+            prom.update_process_metrics(&classified_processes);
+        }
+
+        if let Some(otel_metrics) = &self.telemetry.metrics {
+            otel_metrics.record_process_metrics(&classified_processes);
         }
 
         debug!(
@@ -142,6 +167,7 @@ impl GpuMonService {
         let mut interval = interval(Duration::from_secs(5));
         let ollama_monitor = Arc::clone(&self.ollama_monitor);
         let storage = Arc::clone(&self.storage);
+        let telemetry = Arc::clone(&self.telemetry);
         let mut shutdown_rx = self.shutdown_tx.subscribe();
 
         loop {
@@ -155,6 +181,14 @@ impl GpuMonService {
                     for session in sessions {
                         if let Err(e) = storage.database.insert_llm_session(&session).await {
                             error!("Failed to store LLM session: {}", e);
+                        }
+
+                        if let Some(otel_metrics) = &telemetry.metrics {
+                            otel_metrics.record_llm_session(&session);
+                        }
+
+                        if let Some(prom) = &telemetry.prometheus {
+                            prom.record_llm_session(&session);
                         }
                     }
                     ollama_monitor.clear_completed_sessions().await;

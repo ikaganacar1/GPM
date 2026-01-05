@@ -37,6 +37,15 @@ pub enum GpuMonError {
 
     #[error("Invalid data: {0}")]
     InvalidData(String),
+
+    #[error("Prometheus error: {0}")]
+    PrometheusError(String),
+}
+
+impl From<prometheus::Error> for GpuMonError {
+    fn from(e: prometheus::Error) -> Self {
+        GpuMonError::PrometheusError(e.to_string())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, GpuMonError>;

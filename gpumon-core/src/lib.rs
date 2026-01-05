@@ -5,6 +5,7 @@ pub mod gpu;
 pub mod ollama;
 pub mod service;
 pub mod storage;
+pub mod telemetry;
 
 pub use config::GpuMonConfig;
 pub use error::{GpuMonError, Result};
