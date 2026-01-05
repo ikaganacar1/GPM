@@ -1,0 +1,61 @@
+# GPM Configuration Example
+# Copy this file to ~/.config/gpumon/config.toml to customize
+
+[service]
+# How often to poll GPU metrics (in seconds)
+poll_interval_secs = 2
+
+# Directory for storing data (SQLite database and archives)
+# Uses ~/.local/share/gpumon by default
+# data_dir = "~/.local/share/gpumon"
+
+[gpu]
+# Enable NVML for GPU monitoring
+enable_nvml = true
+
+# Fallback to nvidia-smi if NVML fails
+fallback_to_nvidia_smi = false
+
+[ollama]
+# Enable Ollama LLM monitoring
+enabled = true
+
+# Ollama API port
+api_port = 11434
+
+# Ollama API URL
+api_url = "http://localhost:11434"
+
+[storage]
+# Number of days to keep data in SQLite before archiving
+retention_days = 7
+
+# Enable automatic Parquet archival of old data
+enable_parquet_archival = true
+
+# Directory for Parquet archives
+# Uses ~/.local/share/gpumon/archive by default
+# archive_dir = "~/.local/share/gpumon/archive"
+
+[telemetry]
+# Enable OpenTelemetry export
+enable_opentelemetry = true
+
+# OpenTelemetry OTLP endpoint
+otlp_endpoint = "http://localhost:4317"
+
+# Enable Prometheus metrics endpoint
+enable_prometheus = true
+
+# Prometheus metrics port
+metrics_port = 9090
+
+[alerts]
+# Temperature threshold for alerts (Celsius)
+temp_threshold_celsius = 85.0
+
+# Memory usage threshold for alerts (percent)
+memory_threshold_percent = 90.0
+
+# Enable desktop notifications (requires notification daemon)
+enable_desktop_notifications = false

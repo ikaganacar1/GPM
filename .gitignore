@@ -1,0 +1,34 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# GPM data
+*.db
+*.db-shm
+*.db-wal
+*.parquet
+archive/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Build artifacts
+dist/
+build/
