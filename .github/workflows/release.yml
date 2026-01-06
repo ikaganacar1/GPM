@@ -17,10 +17,10 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             arch: x86_64
-            rust_target: x86_64-unknown-linux-gnu
+            use_cross: false
           - target: aarch64-unknown-linux-gnu
             arch: arm64
-            rust_target: aarch64-unknown-linux-gnu
+            use_cross: true
 
     steps:
       - name: Checkout code
@@ -29,18 +29,16 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.rust_target }}
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Install cross-compilation tools
-        if: matrix.arch == 'arm64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-aarch64-linux-gnu-base
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -58,11 +56,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ matrix.rust_target }}
+          key: ${{ runner.os }}-cargo-build-target-${{ matrix.target }}
 
       - name: Build backend
         run: |
-          cargo build --release --package gpm-core --target ${{ matrix.rust_target }}
+          if [ "${{ matrix.use_cross }}" = "true" ]; then
+            cross build --release --package gpm-core --target ${{ matrix.target }}
+          else
+            cargo build --release --package gpm-core --target ${{ matrix.target }}
+          fi
 
       - name: Build frontend
         run: |
@@ -73,8 +75,8 @@ jobs:
       - name: Create release package
         run: |
           mkdir -p release
-          cp target/${{ matrix.rust_target }}/release/gpm release/
-          cp target/${{ matrix.rust_target }}/release/gpm-server release/
+          cp target/${{ matrix.target }}/release/gpm release/
+          cp target/${{ matrix.target }}/release/gpm-server release/
           tar czf gpm-${{ matrix.target }}.tar.gz -C release .
 
       - name: Generate checksum
@@ -108,25 +110,25 @@ jobs:
         id: release_notes
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          cat > release_notes.md <<EOF
+          cat > release_notes.md <<'EOF'
           ## GPM $VERSION
 
           ### Downloads
 
           | Architecture | Binary |
           |--------------|--------|
-          | x86_64 | \`gpm-x86_64-unknown-linux-gnu.tar.gz\` |
-          | ARM64 | \`gpm-aarch64-unknown-linux-gnu.tar.gz\` |
+          | x86_64 | `gpm-x86_64-unknown-linux-gnu.tar.gz` |
+          | ARM64 | `gpm-aarch64-unknown-linux-gnu.tar.gz` |
 
           ### Quick Install
 
-          \`\`\`bash
+          ```bash
           curl -sSL https://raw.githubusercontent.com/ikaganacar1/GPM/main/install.sh | bash
-          \`\`\`
+          ```
 
           ### Manual Install
 
-          \`\`\`bash
+          ```bash
           # Download
           wget https://github.com/ikaganacar1/GPM/releases/download/v${VERSION}/gpm-x86_64-unknown-linux-gnu.tar.gz
 
@@ -136,7 +138,7 @@ jobs:
           # Install
           sudo cp gpm /usr/local/bin/
           sudo cp gpm-server /usr/local/bin/
-          \`\`\`
+          ```
 
           ### What's Changed
 
@@ -146,7 +148,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/*
+          files: artifacts/*/*.tar.gz*
           body_path: release_notes.md
           generate_release_notes: false
         env:
