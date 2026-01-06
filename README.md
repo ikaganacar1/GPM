@@ -4,6 +4,11 @@ A production-grade, lightweight GPU and LLM monitoring service that runs as a ba
 
 > This is a vibe coding project.
 
+## Screenshots
+<img width="1826" height="426" alt="2026-01-06-155326_hyprshot" src="https://github.com/user-attachments/assets/3fd50e7b-53bc-42a3-8fff-c64bef334f27" />
+<img width="1820" height="633" alt="2026-01-06-155338_hyprshot" src="https://github.com/user-attachments/assets/7f1f183b-23eb-4ab8-a774-4fbbd6c5904d" />
+<img width="1813" height="546" alt="2026-01-06-155346_hyprshot" src="https://github.com/user-attachments/assets/468aba31-5ad9-417d-8220-a0226c9048c2" />
+
 ## Architecture
 
 ```
