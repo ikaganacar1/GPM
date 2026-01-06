@@ -71,7 +71,7 @@ GPM/
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/ikaganacar1/GPM.git
 cd GPM
 
 # Build the service
