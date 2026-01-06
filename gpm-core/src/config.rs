@@ -39,6 +39,15 @@ pub struct OllamaConfig {
 
     #[serde(default = "default_ollama_url")]
     pub api_url: String,
+
+    #[serde(default = "default_true")]
+    pub enable_proxy: bool,
+
+    #[serde(default = "default_proxy_port")]
+    pub proxy_port: u16,
+
+    #[serde(default = "default_ollama_backend")]
+    pub backend_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,6 +104,9 @@ impl Default for GpmConfig {
                 enabled: true,
                 api_port: default_ollama_port(),
                 api_url: default_ollama_url(),
+                enable_proxy: true,
+                proxy_port: default_proxy_port(),
+                backend_url: default_ollama_backend(),
             },
             storage: StorageConfig {
                 retention_days: default_retention_days(),
@@ -161,6 +173,8 @@ fn default_poll_interval() -> u64 { 2 }
 fn default_retention_days() -> u32 { 7 }
 fn default_ollama_port() -> u16 { 11434 }
 fn default_ollama_url() -> String { "http://localhost:11434".to_string() }
+fn default_proxy_port() -> u16 { 11434 }
+fn default_ollama_backend() -> String { "http://localhost:11435".to_string() }
 fn default_metrics_port() -> u16 { 9090 }
 fn default_temp_threshold() -> f64 { 85.0 }
 fn default_mem_threshold() -> f64 { 90.0 }

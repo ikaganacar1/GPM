@@ -3,6 +3,7 @@ use crate::config::GpmConfig;
 use crate::error::Result;
 use crate::gpu::GpuMonitorBackend;
 use crate::ollama::OllamaMonitor;
+use crate::proxy::OllamaProxy;
 use crate::storage::StorageManager;
 use crate::telemetry::TelemetryManager;
 use std::sync::Arc;
@@ -87,12 +88,29 @@ impl GpmService {
         });
 
         let ollama_task = tokio::spawn(async move {
-            Self::ollama_monitor_loop(ollama_monitor, storage2, telemetry2, config2.ollama.enabled, shutdown_tx2).await
+            Self::ollama_monitor_loop(ollama_monitor.clone(), storage2, telemetry2, config2.ollama.enabled, shutdown_tx2).await
         });
 
         let maintenance_task = tokio::spawn(async move {
-            Self::maintenance_worker_loop(storage3, config3, shutdown_tx3).await
+            Self::maintenance_worker_loop(storage3, config3.clone(), shutdown_tx3).await
         });
+
+        // Spawn proxy task if enabled
+        let proxy_task = if self.config.ollama.enable_proxy {
+            let proxy = OllamaProxy::new(
+                self.config.ollama.proxy_port,
+                self.config.ollama.backend_url.clone(),
+                Arc::clone(&self.ollama_monitor),
+            );
+            let shutdown_rx = self.shutdown_tx.subscribe();
+            Some(tokio::spawn(async move {
+                if let Err(e) = proxy.run(shutdown_rx).await {
+                    error!("Ollama proxy error: {}", e);
+                }
+            }))
+        } else {
+            None
+        };
 
         tokio::select! {
             _ = shutdown_rx.recv() => {
@@ -106,6 +124,9 @@ impl GpmService {
         let _ = self.shutdown_tx.send(());
 
         let _ = tokio::join!(metrics_task, ollama_task, maintenance_task);
+        if let Some(task) = proxy_task {
+            let _ = task.await;
+        }
 
         info!("GPU Monitoring Service stopped");
         Ok(())

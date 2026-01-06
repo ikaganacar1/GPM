@@ -40,6 +40,9 @@ pub enum GpmError {
 
     #[error("Prometheus error: {0}")]
     PrometheusError(String),
+
+    #[error("Proxy error: {0}")]
+    ProxyError(String),
 }
 
 impl From<prometheus::Error> for GpmError {

@@ -4,6 +4,7 @@ pub mod config;
 pub mod error;
 pub mod gpu;
 pub mod ollama;
+pub mod proxy;
 pub mod service;
 pub mod storage;
 pub mod telemetry;

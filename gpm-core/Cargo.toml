@@ -26,6 +26,10 @@ prometheus.workspace = true
 axum.workspace = true
 tower-http = { version = "0.5", features = ["cors"] }
 reqwest.workspace = true
+hyper.workspace = true
+http-body-util.workspace = true
+bytes.workspace = true
+futures-util.workspace = true
 chrono.workspace = true
 config.workspace = true
 once_cell.workspace = true
@@ -35,7 +39,7 @@ regex = "1.11"
 glob = "0.3"
 dirs = "5.0"
 hostname = "0.4"
-uuid = "1.11"
+uuid = { version = "1.11", features = ["v4"] }
 
 [dev-dependencies]
 mockall = "0.13"

@@ -3,7 +3,17 @@ use nvml_wrapper::{Device, Nvml};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::ffi::OsStr;
 use tracing::{debug, error, info, warn};
+
+/// NVML library names/paths to try, in order of preference.
+/// Most systems have libnvidia-ml.so.1 (versioned), not libnvidia-ml.so.
+const NVML_LIB_PATHS: &[&str] = &[
+    "libnvidia-ml.so",              // Default (works if symlink exists)
+    "libnvidia-ml.so.1",            // Versioned library (most common)
+    "/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1",  // Full path (common Debian/Ubuntu)
+    "/usr/lib64/libnvidia-ml.so.1", // Full path (common Fedora/RHEL)
+];
 
 static NVML_INSTANCE: OnceCell<Arc<Nvml>> = OnceCell::new();
 
@@ -36,13 +46,7 @@ pub struct NvmlMonitor {
 impl NvmlMonitor {
     pub fn new() -> Result<Self> {
         let nvml = NVML_INSTANCE.get_or_try_init(|| {
-            info!("Initializing NVML");
-            Nvml::init()
-                .map(Arc::new)
-                .map_err(|e| {
-                    error!("Failed to initialize NVML: {:?}", e);
-                    GpmError::NvmlInitError(format!("{:?}", e))
-                })
+            Self::init_nvml()
         })?;
 
         let device_count = nvml.device_count()
@@ -57,6 +61,46 @@ impl NvmlMonitor {
             nvml: Arc::clone(nvml),
             device_count,
         })
+    }
+
+    /// Initialize NVML by trying multiple library paths.
+    /// This handles systems where only the versioned library (libnvidia-ml.so.1) exists.
+    fn init_nvml() -> Result<Arc<Nvml>> {
+        info!("Initializing NVML");
+
+        // First try the default initialization (works if libnvidia-ml.so symlink exists)
+        match Nvml::init() {
+            Ok(nvml) => {
+                info!("NVML initialized with default library");
+                return Ok(Arc::new(nvml));
+            }
+            Err(default_err) => {
+                debug!("Default NVML init failed: {:?}, trying alternative paths", default_err);
+            }
+        }
+
+        // Try each alternative library path using the builder
+        for lib_path in NVML_LIB_PATHS.iter().skip(1) {
+            debug!("Trying NVML library: {}", lib_path);
+            match Nvml::builder()
+                .lib_path(OsStr::new(lib_path))
+                .init()
+            {
+                Ok(nvml) => {
+                    info!("NVML initialized successfully with library: {}", lib_path);
+                    return Ok(Arc::new(nvml));
+                }
+                Err(e) => {
+                    debug!("Failed to load {}: {:?}", lib_path, e);
+                }
+            }
+        }
+
+        // All attempts failed
+        error!("Failed to initialize NVML with all available library paths");
+        Err(GpmError::NvmlInitError(
+            "Could not find libnvidia-ml.so or libnvidia-ml.so.1".to_string()
+        ))
     }
 
     pub fn device_count(&self) -> u32 {

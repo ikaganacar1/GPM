@@ -8,15 +8,17 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+FRONTEND_PORT=8011
+
 echo -e "${YELLOW}Stopping GPM services...${NC}"
 
-# Stop backend
+# Stop monitoring service
 if pgrep -f "target/release/gpm" > /dev/null; then
-    echo "Stopping backend service..."
+    echo "Stopping monitoring service..."
     pkill -f "target/release/gpm"
-    echo -e "${GREEN}Backend stopped${NC}"
+    echo -e "${GREEN}Monitoring service stopped${NC}"
 else
-    echo -e "${YELLOW}Backend not running${NC}"
+    echo -e "${YELLOW}Monitoring service not running${NC}"
 fi
 
 # Stop API server
@@ -28,13 +30,24 @@ else
     echo -e "${YELLOW}API server not running${NC}"
 fi
 
-# Stop frontend
-if lsof -Pi :8009 -sTCP:LISTEN -t >/dev/null 2>&1; then
+# Stop frontend (reverse proxy)
+if pgrep -f "gpm-dashboard/server.py" > /dev/null; then
     echo "Stopping frontend dashboard..."
-    fuser -k 8009/tcp 2>/dev/null || true
+    pkill -f "gpm-dashboard/server.py"
+    echo -e "${GREEN}Frontend stopped${NC}"
+elif lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "Stopping frontend dashboard on port $FRONTEND_PORT..."
+    fuser -k $FRONTEND_PORT/tcp 2>/dev/null || true
     echo -e "${GREEN}Frontend stopped${NC}"
 else
     echo -e "${YELLOW}Frontend not running${NC}"
+fi
+
+# Also kill old port 8009 if still in use
+if lsof -Pi :8009 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "Stopping old frontend on port 8009..."
+    fuser -k 8009/tcp 2>/dev/null || true
+    echo -e "${GREEN}Old frontend stopped${NC}"
 fi
 
 echo ""

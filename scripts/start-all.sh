@@ -1,6 +1,6 @@
 #!/bin/bash
 # GPM Full Deployment Script
-# Starts both backend service and frontend dashboard
+# Starts monitoring service, API server, and frontend dashboard with reverse proxy
 
 set -e
 
@@ -14,6 +14,16 @@ NC='\033[0m' # No Color
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
+FRONTEND_PORT=8011
+API_PORT=8010
+
+# Check for --background flag
+if [ "$1" = "--background" ] || [ "$1" = "-b" ]; then
+    BACKGROUND_MODE=true
+else
+    BACKGROUND_MODE=false
+fi
+
 echo -e "${BLUE}GPM - GPU & LLM Monitoring${NC}"
 echo "======================================"
 echo ""
@@ -22,17 +32,21 @@ echo ""
 cleanup() {
     echo ""
     echo -e "${YELLOW}Stopping services...${NC}"
-    pkill -f "python3 -m http.server 8009" 2>/dev/null || true
+    pkill -f "gpm-dashboard/server.py" 2>/dev/null || true
+    pkill -f "target/release/gpm-server" 2>/dev/null || true
     pkill -f "target/release/gpm" 2>/dev/null || true
+    sleep 1
     echo -e "${GREEN}All services stopped${NC}"
     exit 0
 }
 
-# Trap SIGINT and SIGTERM
-trap cleanup SIGINT SIGTERM
+# Only trap signals if not in background mode
+if [ "$BACKGROUND_MODE" = false ]; then
+    trap cleanup SIGINT SIGTERM
+fi
 
-# Start backend
-echo -e "${GREEN}[1/2] Starting backend service...${NC}"
+# Start monitoring service (gpm)
+echo -e "${GREEN}[1/3] Starting monitoring service...${NC}"
 if ! pgrep -f "target/release/gpm" > /dev/null; then
     if [ ! -f "target/release/gpm" ]; then
         echo -e "${YELLOW}Building backend...${NC}"
@@ -48,28 +62,45 @@ if ! pgrep -f "target/release/gpm" > /dev/null; then
 
     ./target/release/gpm > /tmp/gpm.log 2>&1 &
     sleep 2
-    echo -e "${GREEN}Backend started${NC}"
+    echo -e "${GREEN}Monitoring service started${NC}"
 else
-    echo -e "${YELLOW}Backend already running${NC}"
+    echo -e "${YELLOW}Monitoring service already running${NC}"
 fi
 
-# Start frontend
-echo -e "${GREEN}[2/2] Starting frontend dashboard...${NC}"
+# Start API server (gpm-server)
+echo -e "${GREEN}[2/3] Starting API server on port $API_PORT...${NC}"
+if ! lsof -Pi :$API_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+    ./target/release/gpm-server > /tmp/gpm-server.log 2>&1 &
+    sleep 2
+    echo -e "${GREEN}API server started${NC}"
+else
+    echo -e "${YELLOW}API server already running${NC}"
+fi
+
+# Start frontend with reverse proxy
+echo -e "${GREEN}[3/3] Starting frontend dashboard on port $FRONTEND_PORT...${NC}"
 cd gpm-dashboard
 
-if ! lsof -Pi :8009 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    if [ ! -d "dist" ]; then
-        echo -e "${YELLOW}Building frontend...${NC}"
-        npm run build
-    fi
-
-    cd dist
-    python3 -m http.server 8009 > /dev/null 2>&1 &
+# Stop existing frontend if running
+if lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo -e "${YELLOW}Stopping existing frontend...${NC}"
+    pkill -f "gpm-dashboard/server.py" 2>/dev/null || true
     sleep 1
-    echo -e "${GREEN}Frontend started${NC}"
-else
-    echo -e "${YELLOW}Frontend already running${NC}"
 fi
+
+# Always rebuild frontend
+echo -e "${YELLOW}Building frontend...${NC}"
+npm run build
+
+# Check if server.py exists
+if [ ! -f "server.py" ]; then
+    echo -e "${RED}server.py not found! Cannot start frontend.${NC}"
+    cleanup
+fi
+
+python3 server.py $FRONTEND_PORT > /tmp/gpm-dashboard.log 2>&1 &
+sleep 1
+echo -e "${GREEN}Frontend started${NC}"
 
 cd "$PROJECT_ROOT"
 
@@ -77,10 +108,21 @@ echo ""
 echo -e "${GREEN}======================================${NC}"
 echo -e "${GREEN}GPM is now running!${NC}"
 echo ""
-echo "  Dashboard:  ${BLUE}http://localhost:8009${NC}"
-echo "  Metrics:    ${BLUE}http://localhost:9090/metrics${NC}"
+echo "  Dashboard:  ${BLUE}http://localhost:$FRONTEND_PORT${NC}"
+echo "  API:        ${BLUE}http://localhost:$API_PORT${NC}"
+echo "  Prometheus: ${BLUE}http://localhost:9090/metrics${NC}"
 echo "  Database:   ~/.local/share/gpm/gpm.db"
 echo ""
+echo -e "${YELLOW}For Cloudflare Tunnel, forward to port $FRONTEND_PORT${NC}"
+echo ""
+
+# Exit if in background mode
+if [ "$BACKGROUND_MODE" = true ]; then
+    echo -e "${GREEN}Services running in background${NC}"
+    echo "Run 'scripts/stop-all.sh' to stop all services"
+    exit 0
+fi
+
 echo "Press Ctrl+C to stop all services"
 echo ""
 
@@ -90,11 +132,16 @@ while true; do
 
     # Check if services are still running
     if ! pgrep -f "target/release/gpm" > /dev/null; then
-        echo -e "${RED}Backend service stopped unexpectedly!${NC}"
+        echo -e "${RED}Monitoring service stopped unexpectedly!${NC}"
         cleanup
     fi
 
-    if ! lsof -Pi :8009 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    if ! lsof -Pi :$API_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "${RED}API server stopped unexpectedly!${NC}"
+        cleanup
+    fi
+
+    if ! lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
         echo -e "${RED}Frontend service stopped unexpectedly!${NC}"
         cleanup
     fi
