@@ -4,42 +4,6 @@ A production-grade, lightweight GPU and LLM monitoring service that runs as a ba
 
 > This is a vibe coding project.
 
-## Features
-
-### Phase 1: Core Service (✅ COMPLETED)
-
-- **NVML Integration**: Direct GPU monitoring via NVML with automatic fallback to nvidia-smi
-- **Process Classification**: Automatic detection and categorization of workloads:
-  - Gaming sessions (Steam integration, pattern matching)
-  - LLM inference (Ollama support with token tracking)
-  - ML training (PyTorch, TensorFlow, JAX detection)
-  - General compute
-- **Ollama LLM Monitoring**: Track token counts, TPS (tokens per second), TTFT (time to first token)
-- **SQLite Storage**: Local persistence with automatic cleanup
-- **Parquet Archival**: Efficient long-term storage of historical data
-- **Real-time Metrics**: Poll GPU stats every 2 seconds (configurable)
-
-### Phase 2: OpenTelemetry & Prometheus (✅ COMPLETED)
-
-- **OpenTelemetry Metrics (v0.27)**: GPU, LLM, and process metrics
-- **Prometheus Exporter**: `/metrics` endpoint on port 9090
-- **OTLP Export**: gRPC export to OpenTelemetry collectors
-- **Comprehensive Instrumentation**: All metrics auto-recorded
-- **Grafana-Ready**: Compatible with Grafana Cloud and dashboards
-
-### Phase 3: Dashboard & Web API (✅ COMPLETED)
-
-- **Web Dashboard**: React + TypeScript UI with Chart.js
-  - Circular gauge meters for utilization, memory, temperature, power
-  - Separate historical charts for each metric with trend indicators
-  - Min/Avg/Max statistics on charts
-  - Multi-GPU support
-  - Auto-refresh every 0.5 seconds
-  - LLM sessions panel with model performance comparison
-- **Transparent Ollama Proxy**: Intercepts LLM requests for automatic session tracking
-- **Web API Server**: REST endpoints on port 8010
-- **Deployment Scripts**: Easy start/stop scripts for all services
-
 ## Architecture
 
 ```
@@ -64,14 +28,6 @@ GPM/
 └── scripts/              # Deployment scripts
 ```
 
-## Requirements
-
-- **Rust**: 1.70+ (2021 edition)
-- **Node.js**: 20+ (for dashboard development)
-- **NVIDIA GPU**: With NVML-compatible drivers (470+)
-- **CUDA/NVML**: Installed with driver
-- **Linux**: Primary target (Windows/macOS support varies)
-- **Optional**: Ollama for LLM monitoring
 
 ## Installation
 
