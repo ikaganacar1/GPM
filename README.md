@@ -75,6 +75,43 @@ GPM/
 
 ## Installation
 
+### Quick Install (Recommended)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/ikaganacar1/GPM/main/install.sh | bash
+```
+
+This will:
+- Detect your architecture (x86_64/arm64)
+- Download the latest pre-built binary
+- Install to `~/.local/bin`
+- Set up systemd service (if available)
+- Start the monitoring service
+
+### From Release Binaries
+
+Download from [GitHub Releases](https://github.com/ikaganacar1/GPM/releases):
+
+```bash
+# Download and extract
+wget https://github.com/ikaganacar1/GPM/releases/latest/download/gpm-x86_64-unknown-linux-gnu.tar.gz
+tar xzf gpm-x86_64-unknown-linux-gnu.tar.gz
+
+# Install binaries
+sudo cp gpm /usr/local/bin/
+sudo cp gpm-server /usr/local/bin/
+```
+
+### Arch Linux (AUR)
+
+Coming soon! PKGBUILD is included in the repo for manual builds:
+
+```bash
+git clone https://github.com/ikaganacar1/GPM.git
+cd GPM
+makepkg -si
+```
+
 ### From Source
 
 ```bash
@@ -92,10 +129,10 @@ cargo build --release --package gpm-core
 
 ```bash
 # Run the monitoring service
-cargo run --package gpm-core
-
-# Or use the compiled binary
 ./target/release/gpm
+
+# Or with cargo
+cargo run --package gpm-core
 ```
 
 The service will:
@@ -105,6 +142,25 @@ The service will:
 4. Classify running processes
 5. Start Ollama proxy if enabled
 6. Archive old data to Parquet files
+
+### Uninstall
+
+```bash
+# Stop services
+systemctl --user stop gpm gpm-server 2>/dev/null || true
+pkill gpm 2>/dev/null || true
+
+# Remove binaries
+rm -f ~/.local/bin/gpm ~/.local/bin/gpm-server
+sudo rm -f /usr/local/bin/gpm /usr/local/bin/gpm-server 2>/dev/null || true
+
+# Remove systemd services
+rm -f ~/.config/systemd/user/gpm.service
+rm -f ~/.config/systemd/user/gpm-server.service
+
+# Optionally remove data
+# rm -rf ~/.local/share/gpm ~/.config/gpm
+```
 
 ### Using the Dashboard
 
