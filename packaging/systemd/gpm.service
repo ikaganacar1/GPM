@@ -1,0 +1,24 @@
+[Unit]
+Description=GPM GPU & LLM Monitor
+Documentation=https://github.com/ikaganacar1/GPM
+After=network.target nvidia-persistenced.service
+Wants=nvidia-persistenced.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/gpm
+Restart=on-failure
+RestartSec=5s
+
+# Performance
+Nice=-5
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gpm /etc/gpm
+
+[Install]
+WantedBy=multi-user.target

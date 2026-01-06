@@ -1,0 +1,153 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            arch: x86_64
+            rust_target: x86_64-unknown-linux-gnu
+          - target: aarch64-unknown-linux-gnu
+            arch: arm64
+            rust_target: aarch64-unknown-linux-gnu
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install cross-compilation tools
+        if: matrix.arch == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-aarch64-linux-gnu-base
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ matrix.rust_target }}
+
+      - name: Build backend
+        run: |
+          cargo build --release --package gpm-core --target ${{ matrix.rust_target }}
+
+      - name: Build frontend
+        run: |
+          cd gpm-dashboard
+          npm install
+          npm run build
+
+      - name: Create release package
+        run: |
+          mkdir -p release
+          cp target/${{ matrix.rust_target }}/release/gpm release/
+          cp target/${{ matrix.rust_target }}/release/gpm-server release/
+          tar czf gpm-${{ matrix.target }}.tar.gz -C release .
+
+      - name: Generate checksum
+        run: sha256sum gpm-${{ matrix.target }}.tar.gz > gpm-${{ matrix.target }}.tar.gz.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpm-${{ matrix.target }}
+          path: |
+            gpm-${{ matrix.target }}.tar.gz
+            gpm-${{ matrix.target }}.tar.gz.sha256
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cat > release_notes.md <<EOF
+          ## GPM $VERSION
+
+          ### Downloads
+
+          | Architecture | Binary |
+          |--------------|--------|
+          | x86_64 | \`gpm-x86_64-unknown-linux-gnu.tar.gz\` |
+          | ARM64 | \`gpm-aarch64-unknown-linux-gnu.tar.gz\` |
+
+          ### Quick Install
+
+          \`\`\`bash
+          curl -sSL https://raw.githubusercontent.com/ikaganacar1/GPM/main/install.sh | bash
+          \`\`\`
+
+          ### Manual Install
+
+          \`\`\`bash
+          # Download
+          wget https://github.com/ikaganacar1/GPM/releases/download/v${VERSION}/gpm-x86_64-unknown-linux-gnu.tar.gz
+
+          # Extract
+          tar xzf gpm-x86_64-unknown-linux-gnu.tar.gz
+
+          # Install
+          sudo cp gpm /usr/local/bin/
+          sudo cp gpm-server /usr/local/bin/
+          \`\`\`
+
+          ### What's Changed
+
+          See [CHANGELOG.md](https://github.com/ikaganacar1/GPM/blob/main/CHANGELOG.md)
+          EOF
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          body_path: release_notes.md
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
