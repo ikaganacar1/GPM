@@ -1,17 +1,17 @@
 # GPM Quick Start Guide
 
-Get GPM up and running in 5 minutes!
+Get GPM (GPU & LLM Monitoring Service) up and running in 5 minutes!
 
 ## Prerequisites
 
 ```bash
-# Verify you have Rust installed
+# Verify Rust installation
 rustc --version  # Should be 1.70+
 
-# Verify you have NVIDIA drivers and NVML
+# Verify NVIDIA drivers
 nvidia-smi
 
-# (Optional) If you want Ollama monitoring
+# (Optional) For Ollama monitoring
 ollama list
 ```
 
@@ -20,11 +20,11 @@ ollama list
 ### Step 1: Build GPM
 
 ```bash
-cd /mnt/2tb_ssd/GPM
+cd GPM
 cargo build --release --package gpm-core
 ```
 
-The binary will be at: `target/release/gpm`
+Binaries will be at: `target/release/gpm` and `target/release/gpm-server`
 
 ### Step 2: (Optional) Configure
 
@@ -32,250 +32,173 @@ The binary will be at: `target/release/gpm`
 # Create config directory
 mkdir -p ~/.config/gpm
 
-# Copy example config
-cp config.example.toml ~/.config/gpm/config.toml
-
-# Edit if needed
+# Default config works, but you can customize
 nano ~/.config/gpm/config.toml
 ```
 
-### Step 3: Run GPM
+### Step 3: Start All Services
 
 ```bash
-# Run directly
-./target/release/gpm
+# Start everything (monitoring, API, dashboard)
+./scripts/start-all.sh
 
-# Or with cargo
-cargo run --release --package gpm-core
+# Or run in background
+./scripts/start-all.sh --background
 
-# Run in background
-nohup ./target/release/gpm > /tmp/gpumon.log 2>&1 &
+# Stop all services
+./scripts/stop-all.sh
 ```
+
+## Access Points
+
+| Service | URL | Port |
+|---------|-----|------|
+| Dashboard | http://localhost:8011 | 8011 |
+| Web API | http://localhost:8010 | 8010 |
+| Ollama Proxy | http://localhost:11434 | 11434 |
+| Prometheus | http://localhost:9090/metrics | 9090 |
+
+## Using the Dashboard
+
+Open http://localhost:8011 in your browser:
+
+- **Real-time gauges** for GPU utilization, memory, temperature, power
+- **Historical charts** with trend indicators (1h, 6h, 24h views)
+- **LLM sessions panel** showing model performance stats
+- **Multi-GPU support** - switch GPUs in the header
+
+## Using Ollama Through the Proxy
+
+```bash
+# Start Ollama on port 11435 (backend)
+OLLAMA_HOST=127.0.0.1:11435 ollama serve
+
+# Use through the GPM proxy on port 11434
+ollama run qwen2:0.5b "Hello"
+
+# Or with curl
+curl http://localhost:11434/api/generate -d '{
+  "model": "qwen2:0.5b",
+  "prompt": "Hello"
+}'
+```
+
+GPM automatically tracks:
+- Model name and version
+- Token counts (prompt, completion, total)
+- Tokens per second (TPS)
+- Time to first token (TTFT)
+- Session duration
 
 ## Verify It's Working
 
-### Check the Logs
+### Check API Server
 
 ```bash
-# If running in foreground, you'll see:
-# INFO GPM - GPU & LLM Monitoring Service
-# INFO Version: 0.1.0
-# INFO NVML initialized successfully with X device(s)
-# INFO Storage manager initialized
+curl http://localhost:8010/api/info
 ```
 
-### Check the Database
+### Check Database
 
 ```bash
-# After a few seconds, check that data is being collected
 sqlite3 ~/.local/share/gpm/gpm.db
 
-# Query recent metrics
+# Count GPU metrics
 SELECT COUNT(*) FROM gpu_metrics;
 
-# Should show increasing number of records
+# View latest metrics
+SELECT datetime(timestamp), utilization_gpu, temperature
+FROM gpu_metrics
+ORDER BY timestamp DESC LIMIT 10;
+
+# View LLM sessions
+SELECT model, total_tokens, tokens_per_second
+FROM llm_sessions
+ORDER BY start_time DESC LIMIT 10;
 ```
 
-### View Real-time Data
+### View Prometheus Metrics
 
 ```bash
-# Watch the database grow
-watch -n 1 'sqlite3 ~/.local/share/gpm/gpm.db "SELECT COUNT(*) as total_metrics FROM gpu_metrics"'
-
-# View latest GPU metrics
-sqlite3 ~/.local/share/gpm/gpm.db "
-SELECT
-    datetime(timestamp) as time,
-    gpu_id,
-    utilization_gpu as gpu_util,
-    memory_used / 1024 / 1024 as mem_mb,
-    temperature as temp_c,
-    power_usage as power_w
-FROM gpu_metrics
-ORDER BY timestamp DESC
-LIMIT 10;
-"
-```
-
-## Usage Examples
-
-### Monitor Gaming Session
-
-1. Start GPM: `./target/release/gpm`
-2. Launch a game from Steam
-3. After your session, query:
-
-```sql
-sqlite3 ~/.local/share/gpm/gpm.db "
-SELECT
-    name,
-    category,
-    datetime(timestamp) as time,
-    gpu_memory_mb,
-    gpu_utilization
-FROM process_events
-WHERE category = 'gaming'
-ORDER BY timestamp DESC
-LIMIT 20;
-"
-```
-
-### Monitor Ollama Sessions
-
-1. Start Ollama: `ollama run llama2`
-2. GPM will automatically track sessions
-3. Query results:
-
-```sql
-sqlite3 ~/.local/share/gpm/gpm.db "
-SELECT
-    model,
-    datetime(start_time) as started,
-    prompt_tokens,
-    completion_tokens,
-    ROUND(tokens_per_second, 2) as tps,
-    time_to_first_token_ms as ttft_ms
-FROM llm_sessions
-ORDER BY start_time DESC
-LIMIT 10;
-"
-```
-
-### Weekly Summary
-
-```sql
-sqlite3 ~/.local/share/gpm/gpm.db "
-SELECT
-    category,
-    event_count,
-    ROUND(avg_gpu_utilization, 2) as avg_gpu_util,
-    ROUND(total_duration_secs / 3600.0, 2) as hours
-FROM weekly_summaries
-ORDER BY week_start DESC, hours DESC;
-"
+curl http://localhost:9090/metrics
 ```
 
 ## Troubleshooting
 
-### Problem: "NVML initialization failed"
+### "NVML initialization failed"
 
 ```bash
 # Check NVIDIA drivers
 nvidia-smi
 
-# If that fails, install drivers:
-# Ubuntu/Debian:
-sudo apt install nvidia-driver-XXX
-
-# Then restart GPM
-```
-
-**Workaround:** Enable fallback mode in config:
-```toml
+# Enable fallback mode in ~/.config/gpm/config.toml:
 [gpu]
 fallback_to_nvidia_smi = true
 ```
 
-### Problem: "Ollama API not reachable"
+### "Ollama proxy not working"
 
 ```bash
-# Check if Ollama is running
-curl http://localhost:11434/api/tags
+# Check Ollama is running on port 11435
+curl http://localhost:11435/api/tags
 
-# Start Ollama if needed
-ollama serve
-
-# Or disable Ollama monitoring in config:
+# Verify proxy is enabled in config:
 [ollama]
-enabled = false
+enable_proxy = true
+proxy_port = 11434
+backend_url = "http://localhost:11435"
 ```
 
-### Problem: High disk usage
+### "Dashboard not loading"
 
 ```bash
-# Check database size
-du -h ~/.local/share/gpm/gpm.db
+# Check API server
+curl http://localhost:8010/api/info
 
-# Enable archival in config:
+# Rebuild frontend
+cd gpm-dashboard
+npm run build
+```
+
+## Configuration Example
+
+Create `~/.config/gpm/config.toml`:
+
+```toml
+[service]
+poll_interval_secs = 2
+
+[gpu]
+enable_nvml = true
+fallback_to_nvidia_smi = false
+
+[ollama]
+enabled = true
+enable_proxy = true
+proxy_port = 11434
+backend_url = "http://localhost:11435"
+
 [storage]
+retention_days = 7
 enable_parquet_archival = true
-retention_days = 3  # Reduce retention
 
-# Manually clean old data:
-sqlite3 ~/.local/share/gpm/gpm.db "
-DELETE FROM gpu_metrics WHERE timestamp < datetime('now', '-3 days');
-VACUUM;
-"
+[telemetry]
+enable_prometheus = true
+metrics_port = 9090
 ```
 
-## Next Steps
-
-1. **Explore the data**: Try different SQL queries on your GPU usage
-2. **Customize config**: Adjust polling interval, retention, etc.
-3. **Set up systemd** (optional): Run GPM as a system service
-4. **Wait for Phase 2**: OpenTelemetry and Prometheus metrics
-5. **Wait for Phase 3**: Beautiful Tauri dashboard!
-
-## Stopping GPM
+## Development Mode
 
 ```bash
-# If running in foreground: Ctrl+C
-
-# If running in background:
-pkill gpm
-
-# Or find and kill:
-ps aux | grep gpumon
-kill <PID>
-```
-
-## Useful Queries
-
-### GPU Utilization Over Time
-
-```sql
-SELECT
-    datetime(timestamp) as time,
-    AVG(utilization_gpu) as avg_util,
-    MAX(utilization_gpu) as max_util
-FROM gpu_metrics
-WHERE timestamp > datetime('now', '-1 hour')
-GROUP BY strftime('%Y-%m-%d %H:%M', timestamp)
-ORDER BY time DESC;
-```
-
-### Process Summary
-
-```sql
-SELECT
-    category,
-    COUNT(*) as processes,
-    AVG(gpu_memory_mb) as avg_mem_mb,
-    MAX(gpu_utilization) as max_util
-FROM process_events
-WHERE timestamp > datetime('now', '-1 day')
-GROUP BY category
-ORDER BY processes DESC;
-```
-
-### LLM Performance Stats
-
-```sql
-SELECT
-    model,
-    COUNT(*) as sessions,
-    AVG(tokens_per_second) as avg_tps,
-    AVG(time_to_first_token_ms) as avg_ttft,
-    SUM(total_tokens) as total_tokens
-FROM llm_sessions
-GROUP BY model
-ORDER BY sessions DESC;
+cd gpm-dashboard
+npm install
+npm run dev    # Development server with hot reload
+npm run build  # Production build
 ```
 
 ## Get Help
 
-- Read the full README: [README.md](README.md)
-- Check configuration: [config.example.toml](config.example.toml)
-- Report issues: [GitHub Issues](your-repo-url/issues)
+- Full documentation: [README.md](README.md)
+- Report issues on GitHub
 
 Happy monitoring! 🚀
