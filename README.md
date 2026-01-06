@@ -2,6 +2,8 @@
 
 A production-grade, lightweight GPU and LLM monitoring service that runs as a background daemon. GPM tracks GPU usage, classifies workloads (gaming, LLM inference, ML training, general compute), and provides comprehensive monitoring with OpenTelemetry integration.
 
+> This is a vibe coding project.
+
 ## Features
 
 ### Phase 1: Core Service (✅ COMPLETED)
